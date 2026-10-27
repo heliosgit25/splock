@@ -82,7 +82,7 @@ fun SportsClockScreen(modifier: Modifier = Modifier) {
 
             Text(
                 text = "SPORTS CLOCK",
-                fontSize = 14.sp,
+                fontSize = 15.sp,
                 color = MaterialTheme.colorScheme.primary
             )
 
