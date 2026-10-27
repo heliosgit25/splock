@@ -1,10 +1,14 @@
 package com.example.splock
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.media.MediaPlayer
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -60,6 +64,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.example.splock.ui.theme.SplockTheme
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
@@ -87,8 +92,22 @@ data class AlarmItem(
 )
 
 class MainActivity : ComponentActivity() {
+
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        // Handle response
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+
         enableEdgeToEdge()
         setContent {
             var darkTheme by remember { mutableStateOf(true) }
@@ -312,6 +331,7 @@ fun SportsClockScreen(modifier: Modifier = Modifier) {
 
 @Composable
 fun AlarmScreen(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
     var alarms by remember {
         mutableStateOf(
             listOf(
@@ -431,7 +451,7 @@ fun AlarmScreen(modifier: Modifier = Modifier) {
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = "Repeat: ${alarm.repeatDays.joinToString(", ")} • Snooze: ${alarm.snoozeDuration}m • Tone: ${alarm.alarmTone}",
+                                    text = "Repeat: ${if (alarm.repeatDays.isEmpty()) "Once" else alarm.repeatDays.joinToString(", ")} • Snooze: ${alarm.snoozeDuration}m",
                                     fontSize = 12.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -440,8 +460,12 @@ fun AlarmScreen(modifier: Modifier = Modifier) {
                             Switch(
                                 checked = alarm.enabled,
                                 onCheckedChange = { isChecked ->
-                                    alarms = alarms.map {
-                                        if (it.id == alarm.id) it.copy(enabled = isChecked) else it
+                                    val updated = alarm.copy(enabled = isChecked)
+                                    alarms = alarms.map { if (it.id == alarm.id) updated else it }
+                                    if (isChecked) {
+                                        AlarmManagerHelper.scheduleAlarm(context, updated)
+                                    } else {
+                                        AlarmManagerHelper.cancelAlarm(context, updated.id)
                                     }
                                 }
                             )
@@ -489,11 +513,19 @@ fun AlarmScreen(modifier: Modifier = Modifier) {
                 } else {
                     alarms = alarms + updated
                 }
+                
+                if (updated.enabled) {
+                    AlarmManagerHelper.scheduleAlarm(context, updated)
+                } else {
+                    AlarmManagerHelper.cancelAlarm(context, updated.id)
+                }
+
                 showDialog = false
                 editingAlarm = null
             },
             onDelete = { deletedId ->
                 alarms = alarms.filter { it.id != deletedId }
+                AlarmManagerHelper.cancelAlarm(context, deletedId)
                 showDialog = false
                 editingAlarm = null
             }

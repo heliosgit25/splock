@@ -2,6 +2,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Alarm Permissions -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -11,6 +18,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Splock">
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -19,10 +27,22 @@
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-    </application>
 
+        <activity
+            android:name=".AlarmTriggerActivity"
+            android:exported="false"
+            android:showOnLockScreen="true"
+            android:showForAllUsers="true"
+            android:turnScreenOn="true"
+            android:launchMode="singleInstance"
+            android:theme="@style/Theme.Splock" />
+
+        <receiver
+            android:name=".AlarmReceiver"
+            android:exported="false" />
+
+    </application>
 </manifest>
