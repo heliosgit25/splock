@@ -110,7 +110,7 @@ fun SportsClockScreen(modifier: Modifier = Modifier) {
                 color = MaterialTheme.colorScheme.onBackground
             )
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(31.dp))
 
             Text(
                 text = "TODAY'S MATCHES",
