@@ -1,9 +1,15 @@
 package com.example.splock
 
+import android.app.KeyguardManager
 import android.app.NotificationManager
 import android.content.Context
+import android.media.AudioAttributes
 import android.media.MediaPlayer
+import android.os.Build
 import android.os.Bundle
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -29,16 +35,29 @@ import com.example.splock.ui.theme.SplockTheme
 class AlarmTriggerActivity : ComponentActivity() {
 
     private var mediaPlayer: MediaPlayer? = null
+    private var vibrator: Vibrator? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        window.addFlags(
-            WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
-            WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
-            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-            WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
-        )
+        // Handle lock screen and screen wake-up for all Android versions
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(true)
+            setTurnScreenOn(true)
+            val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+            keyguardManager.requestDismissKeyguard(this, null)
+        } else {
+            @Suppress("DEPRECATION")
+            window.addFlags(
+                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
+                WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
+                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+            )
+        }
+        
+        // Always keep the screen on while the alarm is ringing
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         val alarmId = intent.getStringExtra("ALARM_ID") ?: ""
         val alarmName = intent.getStringExtra("ALARM_NAME") ?: "Alarm"
@@ -48,6 +67,23 @@ class AlarmTriggerActivity : ComponentActivity() {
         // Dismiss the notification since the user is seeing the activity
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.cancel(alarmId.hashCode())
+
+        // Setup Vibration
+        vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val vibratorManager = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+            vibratorManager.defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+        }
+
+        val pattern = longArrayOf(0, 500, 500) // wait 0ms, vibrate 500ms, sleep 500ms
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator?.vibrate(VibrationEffect.createWaveform(pattern, 0)) // 0 means loop infinitely
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator?.vibrate(pattern, 0)
+        }
 
         // Play Sound
         val resId = when (alarmTone) {
@@ -59,6 +95,12 @@ class AlarmTriggerActivity : ComponentActivity() {
         }
         
         mediaPlayer = MediaPlayer.create(this, resId)?.apply {
+            setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ALARM)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build()
+            )
             isLooping = true
             setVolume(alarmVolume, alarmVolume)
             start()
@@ -109,6 +151,7 @@ class AlarmTriggerActivity : ComponentActivity() {
     }
 
     private fun dismissAlarm() {
+        vibrator?.cancel()
         mediaPlayer?.stop()
         mediaPlayer?.release()
         mediaPlayer = null
@@ -117,6 +160,7 @@ class AlarmTriggerActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        vibrator?.cancel()
         mediaPlayer?.stop()
         mediaPlayer?.release()
         mediaPlayer = null
